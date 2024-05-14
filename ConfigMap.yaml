@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: mongodb-config
+immutable: false
+data:
+  username: admin1
+  mongodb.conf: |
+    storage:
+      dbPath: /data/db
+      journal:
+        enabled: true
+    net:
+      port: 27017
+      bindIp: 0.0.0.0  # Allows connections from all IPs;
+    replication:
+      replSetName: "rs0"
+  mongo-entrypoint.sh: |
+    #!/bin/bash
+    # Wait for MongoDB to spin up
+    sleep 20
+    # Perform replica set initialization.
+    if [ $(hostname) == "mongo-0" ]; then
+      mongo --eval 'if (rs.status().code == 94) { rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo-0.mongo.default.svc.cluster.local:27017", priority: 2 }, { _id: 1, host: "mongo-1.mongo.default.svc.cluster.local:27017", priority: 1 }] }) }'
+    fi
+    # Start MongoDB normally
+    exec mongod --bind_ip_all --replSet rs0 --config /etc/mongo/mongodb.conf

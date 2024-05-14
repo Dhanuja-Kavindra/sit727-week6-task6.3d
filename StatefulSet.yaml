@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: "mongo"
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+      - name: mongo
+        image: mongo:4.0.8
+        ports:
+        - containerPort: 27017
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            cp /usr/local/bin/mongo-entrypoint.sh /tmp/mongo-entrypoint.sh
+            chmod +x /tmp/mongo-entrypoint.sh
+            /tmp/mongo-entrypoint.sh
+            exec mongod --bind_ip_all --replSet rs0 --config /etc/mongo/mongodb.conf
+        volumeMounts:
+        - name: mongo-data
+          mountPath: /data/db
+        - name: mongodb-config
+          mountPath: /etc/mongo
+        - name: mongo-scripts
+          mountPath: /usr/local/bin  # This should be the directory, not the specific script
+      volumes:
+        - name: mongodb-config
+          configMap:
+            name: mongodb-config
+            items:
+              - key: mongodb.conf
+                path: mongodb.conf
+        - name: mongo-scripts
+          configMap:
+            name: mongodb-config
+            items:
+              - key: mongo-entrypoint.sh
+                path: mongo-entrypoint.sh
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "mongo-storage"
+      resources:
+        requests:
+          storage: 1Gi
